@@ -7,7 +7,6 @@ import { NotificationsProvider } from "@/contexts/notifications-context"
 export const metadata = {
   title: "BIAIA - Your Pregnancy Companion",
   description: "A pregnancy companion app to guide you through your journey",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({

@@ -15,7 +15,7 @@ import { useUser } from "@/contexts/user-context"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { updateUser } = useUser()
+  const { login, register } = useUser()
   const [isLogin, setIsLogin] = useState(true)
   const [formData, setFormData] = useState({
     email: "",
@@ -25,6 +25,7 @@ export default function LoginPage() {
     rememberMe: false,
   })
   const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
@@ -34,47 +35,64 @@ export default function LoginPage() {
     })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setIsLoading(true)
 
     // Simple validation
     if (!formData.email || !formData.password) {
       setError("Please fill in all required fields")
+      setIsLoading(false)
       return
     }
 
     if (!isLogin && !formData.name) {
       setError("Please enter your name")
+      setIsLoading(false)
       return
     }
 
-    // For registration, simulate creating a new account
-    if (!isLogin) {
-      // In a real app, this would be an API call to create a user
-      updateUser({
-        name: formData.name,
-        email: formData.email,
-        dueDate: formData.dueDate || "2025-08-15",
-        notifications: {
-          dailyTips: true,
-          weeklyUpdates: true,
-          appointments: true,
-        },
-      })
+    try {
+      // For registration
+      if (!isLogin) {
+        const success = await register(
+          {
+            name: formData.name,
+            email: formData.email,
+            dueDate: formData.dueDate || "2025-08-15",
+            notifications: {
+              dailyTips: true,
+              weeklyUpdates: true,
+              appointments: true,
+            },
+          },
+          formData.password,
+        )
 
-      // Redirect to home page after successful registration
-      router.push("/")
-      return
-    }
+        if (success) {
+          // Redirect to home page after successful registration
+          router.push("/")
+        } else {
+          setError("Registration failed. Please try again.")
+        }
+      }
+      // For login
+      else {
+        const success = await login(formData.email, formData.password)
 
-    // For login, simulate authentication
-    // In a real app, this would be an API call to verify credentials
-    if (formData.email === "maria@example.com" && formData.password === "password") {
-      // Redirect to home page after successful login
-      router.push("/")
-    } else {
-      setError("Invalid email or password")
+        if (success) {
+          // Redirect to home page after successful login
+          router.push("/")
+        } else {
+          setError("Invalid email or password")
+        }
+      }
+    } catch (err) {
+      setError("An error occurred. Please try again.")
+      console.error(err)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -144,6 +162,7 @@ export default function LoginPage() {
                   value={formData.name}
                   onChange={handleChange}
                   placeholder="Enter your full name"
+                  disabled={isLoading}
                 />
               </div>
             )}
@@ -157,6 +176,7 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="Enter your email"
+                disabled={isLoading}
               />
             </div>
 
@@ -169,13 +189,21 @@ export default function LoginPage() {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"
+                disabled={isLoading}
               />
             </div>
 
             {!isLogin && (
               <div className="space-y-2">
                 <Label htmlFor="dueDate">Due Date (Optional)</Label>
-                <Input id="dueDate" name="dueDate" type="date" value={formData.dueDate} onChange={handleChange} />
+                <Input
+                  id="dueDate"
+                  name="dueDate"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
               </div>
             )}
 
@@ -185,20 +213,47 @@ export default function LoginPage() {
                 name="rememberMe"
                 checked={formData.rememberMe}
                 onCheckedChange={(checked) => setFormData({ ...formData, rememberMe: checked as boolean })}
+                disabled={isLoading}
               />
               <Label htmlFor="rememberMe" className="text-sm">
                 Remember Me
               </Label>
             </div>
 
-            <Button type="submit" className="w-full bg-pink-600 hover:bg-pink-700">
-              {isLogin ? "Sign In" : "Register"}
+            <Button type="submit" className="w-full bg-pink-600 hover:bg-pink-700" disabled={isLoading}>
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  {isLogin ? "Signing In..." : "Creating Account..."}
+                </span>
+              ) : (
+                <span>{isLogin ? "Sign In" : "Create Account"}</span>
+              )}
             </Button>
           </form>
 
           {isLogin && (
             <div className="text-center mt-4">
-              <Link href="#" className="text-sm text-pink-600 hover:underline">
+              <Link href="/forgot-password" className="text-sm text-pink-600 hover:underline">
                 Forgot your password?
               </Link>
             </div>
@@ -207,14 +262,19 @@ export default function LoginPage() {
           <div className="mt-6 pt-6 border-t border-border text-center">
             <p className="text-muted-foreground">
               {isLogin ? "Don't have an account?" : "Already have an account?"}
-              <button type="button" onClick={toggleMode} className="ml-1 text-pink-600 hover:underline font-medium">
+              <button
+                type="button"
+                onClick={toggleMode}
+                className="ml-1 text-pink-600 hover:underline font-medium"
+                disabled={isLoading}
+              >
                 {isLogin ? "Register" : "Sign In"}
               </button>
             </p>
           </div>
 
           <p className="text-xs text-center text-muted-foreground mt-8">
-            By clicking on "Sign In" or "Register" you agree to our{" "}
+            By clicking on "Sign In" or "Create Account" you agree to our{" "}
             <Link href="#" className="text-pink-600 hover:underline">
               Terms of Service
             </Link>{" "}
